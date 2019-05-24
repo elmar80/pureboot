@@ -40,9 +40,6 @@ else
   flash.sh -s /tmp/coreboot.rom | cut -c 1-20 | tr -d '\n' > $HOTP_SECRET
 fi
 
-secret="`cat $HOTP_SECRET`"
-rm -f "$HOTP_SECRET"
-
 # Store counter in file instead of TPM for now, as it conflicts with Heads
 # config TPM counter as TPM 1.2 can only increment one counter between reboots
 # get current value of HOTP counter in TPM, create if absent
@@ -65,21 +62,28 @@ enable_usb
 if ! libremkey_hotp_verification info ; then
   echo "Insert your Librem Key and press Enter to configure it"
   read
-  libremkey_hotp_verification info \
-  || die "Unable to find Librem Key"
+  if ! libremkey_hotp_verification info ; then
+    # don't leak key on failure
+    rm -f "$HOTP_SECRET"
+    die "Unable to find Librem Key"
+  fi
 fi
 
 read -s -p "Enter your Librem Key Admin PIN" admin_pin
 echo
 
-libremkey_hotp_initialize $admin_pin $secret $counter_value 
+libremkey_hotp_initialize $admin_pin $HOTP_SECRET $counter_value 
 if [ $? -ne 0 ]; then
   read -s -p "Error setting HOTP secret, re-enter Admin PIN and try again:" admin_pin
-  libremkey_hotp_initialize $admin_pin $secret $counter_value \
-  || die "Setting HOTP secret failed"
+  if ! libremkey_hotp_initialize $admin_pin $HOTP_SECRET $counter_value ; then
+    # don't leak key on failure
+    rm -f "$HOTP_SECRET"
+    die "Setting HOTP secret failed"
+  fi
 fi
 
-secret=""
+# HOTP key no longer needed
+rm -f "$HOTP_SECRET"
 
 # Make sure our counter is incremented ahead of the next check
 #increment_tpm_counter $counter > /dev/null \
