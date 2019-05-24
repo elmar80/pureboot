@@ -72,10 +72,10 @@ fi
 read -s -p "Enter your Librem Key Admin PIN" admin_pin
 echo
 
-libremkey_hotp_initialize $admin_pin $HOTP_SECRET $counter_value 
+libremkey_hotp_initialize "$admin_pin" $HOTP_SECRET $counter_value 
 if [ $? -ne 0 ]; then
   read -s -p "Error setting HOTP secret, re-enter Admin PIN and try again:" admin_pin
-  if ! libremkey_hotp_initialize $admin_pin $HOTP_SECRET $counter_value ; then
+  if ! libremkey_hotp_initialize "$admin_pin" $HOTP_SECRET $counter_value ; then
     # don't leak key on failure
     rm -f "$HOTP_SECRET"
     die "Setting HOTP secret failed"
