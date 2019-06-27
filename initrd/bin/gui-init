@@ -250,7 +250,7 @@ while true; do
   fi
 
   if [ "$totp_confirm" = "a" ]; then
-    whiptail --clear --title "HEADS Options" \
+    whiptail --clear --title "PureBoot Options" \
       --menu "" 20 90 10 \
       'o' ' Boot Options -->' \
       't' ' TPM/TOTP/HOTP Options -->' \
