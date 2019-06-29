@@ -107,11 +107,19 @@ prompt_update_checksums()
 }
 update_totp()
 {
-  echo "Scan the QR code to add the new TOTP secret"
-  /bin/seal-totp
+  if [ "$CONFIG_TPM" = "y" ]; then
+    echo "Scan the QR code to add the new TOTP secret"
+    /bin/seal-totp
+  else
+    echo "Generating new HOTP secret"
+  fi
+
+  
   if [ -x /bin/hotp_verification ]; then
-    echo "Once you have scanned the QR code, hit Enter to configure your HOTP USB Security Dongle (e.g. Librem Key or Nitrokey)"
-    read
+    if [ "$CONFIG_TPM" = "y" ]; then
+      echo "Once you have scanned the QR code, hit Enter to configure your HOTP USB Security Dongle (e.g. Librem Key or Nitrokey)"
+      read
+    fi
     /bin/seal-hotpkey
   else
     echo "Once you have scanned the QR code, hit Enter to continue"
@@ -239,7 +247,19 @@ while true; do
       HOTP='N/A'
     fi
 
-    whiptail $MAIN_MENU_BG_COLOR --clear --title "$MAIN_MENU_TITLE" \
+    if [[ "$CONFIG_TPM" = n && "$HOTP" = "Invalid code" ]]; then
+      whiptail $BG_COLOR_ERROR --clear --title "ERROR: HOTP Validation Failed!" \
+        --menu "ERROR: Heads couldn't validate the HOTP code.\n\nIf you just reflashed your BIOS, you should generate a new TOTP/HOTP secret.\n\nIf you have not just reflashed your BIOS, THIS COULD INDICATE TAMPERING!\n\nHow would you like to proceed?" 30 90 4 \
+        'g' ' Generate new TOTP/HOTP secret' \
+        'i' ' Ignore error and continue to main menu' \
+        'x' ' Exit to recovery shell' \
+        2>/tmp/whiptail || recovery "GUI menu failed"
+
+      totp_confirm=$(cat /tmp/whiptail)
+    fi
+
+    if [ "$totp_confirm" = "i" -o -z "$totp_confirm" ]; then 
+      whiptail $MAIN_MENU_BG_COLOR --clear --title "$MAIN_MENU_TITLE" \
       --menu "$date\nTOTP: $TOTP | HOTP: $HOTP" 20 90 10 \
       'y' ' Default boot' \
       'r' ' Refresh TOTP/HOTP' \
@@ -248,7 +268,8 @@ while true; do
       'P' ' Power Off' \
       2>/tmp/whiptail || recovery "GUI menu failed"
 
-    totp_confirm=$(cat /tmp/whiptail)
+      totp_confirm=$(cat /tmp/whiptail)
+    fi
   fi
 
   if [ "$totp_confirm" = "a" ]; then
