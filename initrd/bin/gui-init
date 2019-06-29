@@ -109,11 +109,19 @@ prompt_update_checksums()
 }
 update_totp()
 {
-  echo "Scan the QR code to add the new TOTP secret"
-  /bin/seal-totp
+  if [ "$CONFIG_TPM" = "y" ]; then
+    echo "Scan the QR code to add the new TOTP secret"
+    /bin/seal-totp
+  else
+    echo "Generating new HOTP secret"
+  fi
+
+  
   if [ -x /bin/hotp_verification ]; then
-    echo "Once you have scanned the QR code, hit Enter to configure your HOTP USB Security Dongle (e.g. Librem Key or Nitrokey)"
-    read
+    if [ "$CONFIG_TPM" = "y" ]; then
+      echo "Once you have scanned the QR code, hit Enter to configure your HOTP USB Security Dongle (e.g. Librem Key or Nitrokey)"
+      read
+    fi
     /bin/seal-hotpkey
   else
     echo "Once you have scanned the QR code, hit Enter to continue"
@@ -241,31 +249,44 @@ while true; do
       HOTP='N/A'
     fi
 
-    if [[ "$HOTP" = "Success" && $CONFIG_AUTO_BOOT_TIMEOUT && $first_pass = true ]]; then 
-      # save IFS before changing, restore after read
-      IFS_DEF=$IFS
-      IFS=''
-      first_pass=false
-      echo -e "\nHOTP verification success\n\n"
-      read -t $CONFIG_AUTO_BOOT_TIMEOUT -s -n 1 -p "Automatic boot in $CONFIG_AUTO_BOOT_TIMEOUT seconds unless interrupted by keypress... "
-      if [[ $? -ne 0 ]]; then
-        IFS=$IFS_DEF
-        # skip to default boot
-        totp_confirm='y'
-        echo -e "\n\nAttempting default boot...\n\n"
-      fi
-      IFS=$IFS_DEF
+    if [[ "$CONFIG_TPM" = n && "$HOTP" = "Invalid code" ]]; then
+      whiptail $BG_COLOR_ERROR --clear --title "ERROR: HOTP Validation Failed!" \
+        --menu "ERROR: Heads couldn't validate the HOTP code.\n\nIf you just reflashed your BIOS, you should generate a new TOTP/HOTP secret.\n\nIf you have not just reflashed your BIOS, THIS COULD INDICATE TAMPERING!\n\nHow would you like to proceed?" 30 90 4 \
+        'g' ' Generate new TOTP/HOTP secret' \
+        'i' ' Ignore error and continue to main menu' \
+        'x' ' Exit to recovery shell' \
+        2>/tmp/whiptail || recovery "GUI menu failed"
+
+      totp_confirm=$(cat /tmp/whiptail)
     fi
 
-    if [ "$totp_confirm" != "y" -o -z "$totp_confirm" ]; then
+    if [ "$totp_confirm" = "i" -o -z "$totp_confirm" ]; then 
+      if [[ "$HOTP" = "Success" && $CONFIG_AUTO_BOOT_TIMEOUT && $first_pass = true ]]; then 
+        # save IFS before changing, restore after read
+        IFS_DEF=$IFS
+        IFS=''
+        first_pass=false
+        echo -e "\nHOTP verification success\n\n"
+        read -t $CONFIG_AUTO_BOOT_TIMEOUT -s -n 1 -p "Automatic boot in $CONFIG_AUTO_BOOT_TIMEOUT seconds unless interrupted by keypress... "
+        if [[ $? -ne 0 ]]; then
+          IFS=$IFS_DEF
+          # skip to default boot
+          totp_confirm='y'
+          echo -e "\n\nAttempting default boot...\n\n"
+        fi
+        IFS=$IFS_DEF
+      fi
+    fi
+
+    if [ "$totp_confirm" = "i" -o -z "$totp_confirm" ]; then 
       whiptail $MAIN_MENU_BG_COLOR --clear --title "$MAIN_MENU_TITLE" \
-        --menu "$date\nTOTP: $TOTP | HOTP: $HOTP" 20 90 10 \
-        'y' ' Default boot' \
-        'r' ' Refresh TOTP/HOTP' \
-        'a' ' Options -->' \
-        'S' ' System Info' \
-        'P' ' Power Off' \
-        2>/tmp/whiptail || recovery "GUI menu failed"
+      --menu "$date\nTOTP: $TOTP | HOTP: $HOTP" 20 90 10 \
+      'y' ' Default boot' \
+      'r' ' Refresh TOTP/HOTP' \
+      'a' ' Options -->' \
+      'S' ' System Info' \
+      'P' ' Power Off' \
+      2>/tmp/whiptail || recovery "GUI menu failed"
 
       totp_confirm=$(cat /tmp/whiptail)
     fi
