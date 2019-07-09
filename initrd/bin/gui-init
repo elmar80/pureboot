@@ -109,10 +109,9 @@ update_totp()
     fi
     /bin/seal-libremkey
   else
-    echo "Once you have scanned the QR code, hit Enter to reboot"
+    echo "Once you have scanned the QR code, hit Enter to continue"
     read
   fi
-  /bin/reboot
 }
 
 # ensure /boot is sane and mount it before anything else
