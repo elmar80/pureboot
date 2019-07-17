@@ -17,10 +17,6 @@ fi
 TOTP_SECRET="/tmp/secret/totp.key"
 TOTP_SEALED="/tmp/secret/totp.sealed"
 
-if [ ! -e /dev/tpm0 ]; then
-  CONFIG_TPM='n'
-fi
-
 if [ "$CONFIG_TPM" = "y" ]; then
   dd \
     if=/dev/urandom \
@@ -87,8 +83,7 @@ if [ "$CONFIG_TPM" = "y" ]; then
   rm -f "$TOTP_SEALED"
 else
 # without a TPM, use the first 20 characters of the ROM SHA256sum 
-  echo "TPM not configured, measuring ROM directly"
-  flash.sh -s /tmp/coreboot.rom | cut -c 1-20 | tr -d '\n' > $TOTP_SECRET
+  secret_from_rom_hash > $TOTP_SECRET
   secret="`base32 < $TOTP_SECRET`"
   rm -f $TOTP_SECRET
 fi

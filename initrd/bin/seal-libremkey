@@ -16,10 +16,6 @@ mount_boot()
   fi
 }
 
-if [ ! -e /dev/tpm0 ]; then
-  CONFIG_TPM='n'
-fi
-
 if [ "$CONFIG_TPM" = "y" ]; then
   tpm nv_readvalue \
     -in 4d47 \
@@ -35,9 +31,8 @@ if [ "$CONFIG_TPM" = "y" ]; then
 
   rm -f "$HOTP_SEALED"
 else
-# without a TPM, use the first 20 characters of the ROM SHA256sum 
-  echo "TPM not configured, measuring ROM directly"
-  flash.sh -s /tmp/coreboot.rom | cut -c 1-20 | tr -d '\n' > $HOTP_SECRET
+  # without a TPM, use the first 20 characters of the ROM SHA256sum 
+  secret_from_rom_hash > $HOTP_SECRET
 fi
 
 # Store counter in file instead of TPM for now, as it conflicts with Heads
@@ -69,12 +64,15 @@ if ! libremkey_hotp_verification info ; then
   fi
 fi
 
-read -s -p "Enter your Librem Key Admin PIN" admin_pin
-echo
+echo ""
+read -s -p "Enter your Librem Key Admin PIN: " admin_pin
+echo -e "\n"
 
 libremkey_hotp_initialize "$admin_pin" $HOTP_SECRET $counter_value 
 if [ $? -ne 0 ]; then
-  read -s -p "Error setting HOTP secret, re-enter Admin PIN and try again:" admin_pin
+  echo -e "\n"
+  read -s -p "Error setting HOTP secret, re-enter Admin PIN and try again: " admin_pin
+  echo -e "\n"
   if ! libremkey_hotp_initialize "$admin_pin" $HOTP_SECRET $counter_value ; then
     # don't leak key on failure
     rm -f "$HOTP_SECRET"
@@ -101,7 +99,7 @@ echo $counter_value > $HOTP_COUNTER \
 #|| die "Unable to create hotp counter file"
 mount -o remount,ro /boot
 
-echo "Librem Key initialized successfully. Press Enter to continue."
+echo -e "\nLibrem Key initialized successfully. Press Enter to continue."
 read
 
 exit 0

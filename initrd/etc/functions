@@ -135,8 +135,28 @@ confirm_gpg_card()
 	# setup the USB so we can reach the GPG card
 	enable_usb
 
-	gpg --card-status \
-	|| die "gpg card read failed"
+	echo -e "\nVerifying presence of GPG card...\n"
+	# ensure we don't exit without retrying
+	errexit=$(set -o | grep errexit | awk '{print $2}')
+	set +e
+	gpg --card-status > /dev/null
+	if [ $? -ne 0 ]; then
+	  # prompt for reinsertion and try a second time
+	  read -n1 -r -p \
+	      "Can't access GPG key; remove and reinsert, then press Enter to retry. " \
+	      ignored
+	  # restore prev errexit state
+	  if [ "$errexit" = "on" ]; then
+	    set -e
+	  fi
+	  # retry card status
+	  gpg --card-status > /dev/null \
+	  	|| die "gpg card read failed"
+	fi
+	# restore prev errexit state
+	if [ "$errexit" = "on" ]; then
+	  set -e
+	fi
 }
 
 
@@ -238,4 +258,50 @@ replace_config() {
 }
 combine_configs() {
 	cat /etc/config* > /tmp/config
+}
+
+# Generate secret value using first 20 chars of ROM SHA256 hash
+secret_from_rom_hash() {
+	local ROM_IMAGE="/tmp/coreboot-notpm.rom"
+
+	echo -e "\nTPM not detected; measuring ROM directly\n" 1>&2
+	# use a previously-copied image if it exists
+	if [ -f ${ROM_IMAGE} ]; then
+		sha256sum ${ROM_IMAGE} | cut -f1 -d ' ' | cut -c 1-20 | tr -d '\n'
+	else
+		flash.sh -s ${ROM_IMAGE} | cut -c 1-20 | tr -d '\n'
+	fi
+}
+
+update_checksums()
+{
+	# clear screen
+	printf "\033c"
+	# ensure /boot mounted
+	if ! grep -q /boot /proc/mounts ; then
+		mount -o ro /boot \
+		|| recovery "Unable to mount /boot"
+	fi
+	# remount RW
+    	mount -o rw,remount /boot
+	cd /boot
+	find ./ -type f ! -name '*kexec*' | xargs sha256sum > /boot/kexec_hashes.txt
+	if [ -e /boot/kexec_default_hashes.txt ]; then
+	  DEFAULT_FILES=$(cat /boot/kexec_default_hashes.txt | cut -f3 -d ' ')
+	  echo $DEFAULT_FILES | xargs sha256sum > /boot/kexec_default_hashes.txt
+	fi
+	# Remove any package trigger log files
+	# We don't need them after the user decides to sign
+	rm -f /boot/kexec_package_trigger*
+
+	# sign and auto-roll config counter
+	extparam=
+	if [ "$CONFIG_TPM" = "y" ]; then
+	extparam=-u
+	fi
+	kexec-sign-config -p /boot $extparam \
+	|| die "Failed to sign default config"
+
+	# switch back to ro mode
+	mount -o ro,remount /boot
 }
