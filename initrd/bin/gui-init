@@ -222,6 +222,7 @@ while true; do
       'c' ' Change configuration settings -->' \
       'f' ' Flash/Update the BIOS -->' \
       'G' ' GPG Options -->' \
+      'F' ' OEM Factory Reset -->' \
       'x' ' Exit to recovery shell' \
       'r' ' <-- Return to main menu' \
       2>/tmp/whiptail || recovery "GUI menu failed"
@@ -359,6 +360,11 @@ while true; do
 
   if [ "$totp_confirm" = "G" ]; then
     gpg-gui.sh
+    continue
+  fi
+
+  if [ "$totp_confirm" = "F" ]; then
+    oem-factory-reset
     continue
   fi
 
