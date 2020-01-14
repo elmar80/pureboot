@@ -9,6 +9,8 @@ export BG_COLOR_ERROR="${CONFIG_ERROR_BG_COLOR:-"--background-gradient 0 0 0 150
 . /etc/functions
 . /tmp/config
 
+first_pass=true
+
 mount_boot()
 {
   
@@ -250,6 +252,24 @@ while true; do
         2>/tmp/whiptail || recovery "GUI menu failed"
 
       totp_confirm=$(cat /tmp/whiptail)
+    fi
+
+    if [ "$totp_confirm" = "i" -o -z "$totp_confirm" ]; then 
+      if [[ "$HOTP" = "Success" && $CONFIG_AUTO_BOOT_TIMEOUT && $first_pass = true ]]; then 
+        # save IFS before changing, restore after read
+        IFS_DEF=$IFS
+        IFS=''
+        first_pass=false
+        echo -e "\nHOTP verification success\n\n"
+        read -t $CONFIG_AUTO_BOOT_TIMEOUT -s -n 1 -p "Automatic boot in $CONFIG_AUTO_BOOT_TIMEOUT seconds unless interrupted by keypress... "
+        if [[ $? -ne 0 ]]; then
+          IFS=$IFS_DEF
+          # skip to default boot
+          totp_confirm='y'
+          echo -e "\n\nAttempting default boot...\n\n"
+        fi
+        IFS=$IFS_DEF
+      fi
     fi
 
     if [ "$totp_confirm" = "i" -o -z "$totp_confirm" ]; then 
