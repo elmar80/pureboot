@@ -56,7 +56,7 @@ coreboot_target := \
 	CFLAGS_x86_64="$(EXTRA_FLAGS)" \
 	$(MAKE_JOBS)
 
-coreboot_output := coreboot.rom
+coreboot_output := PureBoot-$(BOARD).rom
 coreboot_depend += linux initrd $(musl_dep)
 
 ifeq "$(CONFIG_COREBOOT_VERSION)" "4.8.1"
@@ -78,7 +78,7 @@ $(build)/$(coreboot_dir)/.build: \
 	$(build)/$(BOARD)/initrd.cpio.xz \
 
 # This produces a ROM image that is written with the flashrom program
-$(build)/$(BOARD)/coreboot.rom: $(build)/$(coreboot_dir)/.build
+$(build)/$(BOARD)/PureBoot-$(BOARD).rom: $(build)/$(coreboot_dir)/.build
 	"$(build)/$(coreboot_dir)/cbfstool" "$(dir $<)coreboot.rom" print
 	$(call do-copy,$(dir $<)coreboot.rom,$@)
 	@touch $@   # update the time stamp
