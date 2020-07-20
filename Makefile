@@ -131,7 +131,7 @@ CROSS_TOOLS := \
 
 
 ifeq "$(CONFIG_COREBOOT)" "y"
-all: $(build)/$(BOARD)/coreboot.rom
+all: $(build)/$(BOARD)/pureboot-$(BOARD).rom
 else ifeq "$(CONFIG_LINUXBOOT)" "y"
 all: $(build)/$(BOARD)/linuxboot.rom
 else
