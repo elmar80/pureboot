@@ -161,12 +161,8 @@ else
   mount_boot
 fi
 
-# Use stored HOTP key branding
-if [ -r /boot/kexec_hotp_key ]; then
-	HOTPKEY_BRANDING="$(cat /boot/kexec_hotp_key)"
-else
-	HOTPKEY_BRANDING="HOTP USB Security Dongle"
-fi
+# Use fixed HOTP key branding
+HOTPKEY_BRANDING="Librem Key"
 
 last_half=X
 while true; do
