@@ -17,6 +17,20 @@ index fb01134..bf1973e 100644
  
  SPEC=$(PACKAGE_NAME).spec
  GENERATED_SRCS:= $(SPEC)
+diff --git ./kexec/arch/i386/x86-linux-setup.c ./kexec/arch/i386/x86-linux-setup.c
+index 057ee14..1905173 100644
+--- ./kexec/arch/i386/x86-linux-setup.c
++++ ./kexec/arch/i386/x86-linux-setup.c
+@@ -137,7 +137,8 @@ static int setup_linux_vesafb(struct x86_linux_param_header *real_mode)
+ 		goto out;
+ 	if (-1 == ioctl(fd, FBIOGET_VSCREENINFO, &var))
+ 		goto out;
+-	if (0 == strcmp(fix.id, "VESA VGA")) {
++	if (0 == strcmp(fix.id, "VESA VGA")
++			|| 0 == strcmp(fix.id, "inteldrmfb")) {
+ 		/* VIDEO_TYPE_VLFB */
+ 		real_mode->orig_video_isVGA = 0x23;
+ 	} else if (0 == strcmp(fix.id, "EFI VGA")) {
 diff --git ./kexec/kexec.c ./kexec/kexec.c
 index bc6ab3d..b82725b 100644
 --- ./kexec/kexec.c
