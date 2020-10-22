@@ -1,26 +1,33 @@
-From fcb25d39b270cdd21da3748e2d8f578b405f9a82 Mon Sep 17 00:00:00 2001
+From d337d9a884f082e3e9772994e1ba4aba6aada427 Mon Sep 17 00:00:00 2001
 From: Matt DeVillier <matt.devillier@puri.sm>
 Date: Fri, 26 Jun 2020 00:21:39 -0500
 Subject: [PATCH] mb/purism/librem_whl: Add new board Librem Mini (WHL-U)
 
-Add new librem_whl baseboard and Librem Mini variant
+This is a combination of 3 upstream commits:
+
+ceb409a [mb/purism/librem_whl: Add new board Librem Mini (WHL-U)]
+d32d2c3 [mb/purism/librem_whl: Convert GPIOs to macros]
+25a2ca9 [mb/purism/librem_whl: Drop 3Gbps SATA limit...]
+
+Add new librem_whl baseboard and Librem Mini variant.
+
+https://puri.sm/products/librem-mini/
 
 Signed-off-by: Matt DeVillier <matt.devillier@puri.sm>
-Change-Id: I36af42766f85eb17f86f6ec9b48b87125fb911e6
 ---
- src/mainboard/purism/librem_whl/Kconfig       |  61 +++++
+ src/mainboard/purism/librem_whl/Kconfig       |  62 ++
  src/mainboard/purism/librem_whl/Kconfig.name  |   3 +
- src/mainboard/purism/librem_whl/Makefile.inc  |  10 +
- .../purism/librem_whl/acpi/mainboard.asl      |  16 ++
+ src/mainboard/purism/librem_whl/Makefile.inc  |   7 +
+ .../purism/librem_whl/acpi/mainboard.asl      |  16 +
  .../purism/librem_whl/board_info.txt          |   8 +
- src/mainboard/purism/librem_whl/devicetree.cb | 223 +++++++++++++++++
- src/mainboard/purism/librem_whl/dsdt.asl      |  26 ++
- src/mainboard/purism/librem_whl/ramstage.c    |  16 ++
- src/mainboard/purism/librem_whl/romstage.c    |  52 ++++
- .../librem_whl/variants/librem_mini/gpio.c    | 229 ++++++++++++++++++
- .../variants/librem_mini/hda_verb.c           |  33 +++
+ src/mainboard/purism/librem_whl/devicetree.cb | 317 +++++++
+ src/mainboard/purism/librem_whl/dsdt.asl      |  26 +
+ src/mainboard/purism/librem_whl/ramstage.c    |  13 +
+ src/mainboard/purism/librem_whl/romstage.c    |  59 ++
+ .../librem_whl/variants/librem_mini/gpio.c    | 791 ++++++++++++++++++
+ .../variants/librem_mini/hda_verb.c           |  33 +
  .../librem_mini/include/variant/gpio.h        |  11 +
- 13 files changed, 688 insertions(+)
+ 13 files changed, 1346 insertions(+)
  create mode 100644 src/mainboard/purism/librem_whl/Kconfig
  create mode 100644 src/mainboard/purism/librem_whl/Kconfig.name
  create mode 100644 src/mainboard/purism/librem_whl/Makefile.inc
@@ -36,14 +43,15 @@ Change-Id: I36af42766f85eb17f86f6ec9b48b87125fb911e6
 
 diff --git a/src/mainboard/purism/librem_whl/Kconfig b/src/mainboard/purism/librem_whl/Kconfig
 new file mode 100644
-index 0000000000..f7662a0e72
+index 0000000000..bc25fb5b3b
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/Kconfig
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,62 @@
 +config BOARD_PURISM_BASEBOARD_LIBREM_WHL
 +	def_bool n
 +	select BOARD_ROMSIZE_KB_16384
 +	select DRIVERS_GENERIC_CBFS_SERIAL
++	select DRIVERS_USB_ACPI
 +	select HAVE_ACPI_RESUME
 +	select HAVE_ACPI_TABLES
 +	select INTEL_GMA_HAVE_VBT
@@ -112,13 +120,10 @@ index 0000000000..41a4003102
 +	select BOARD_PURISM_BASEBOARD_LIBREM_WHL
 diff --git a/src/mainboard/purism/librem_whl/Makefile.inc b/src/mainboard/purism/librem_whl/Makefile.inc
 new file mode 100644
-index 0000000000..c03db05423
+index 0000000000..ba157dfd05
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/Makefile.inc
-@@ -0,0 +1,10 @@
-+##
-+##
-+##
+@@ -0,0 +1,7 @@
 +## SPDX-License-Identifier: GPL-2.0-only
 +
 +ramstage-y += variants/$(VARIANT_DIR)/gpio.c
@@ -128,14 +133,14 @@ index 0000000000..c03db05423
 +CPPFLAGS_common += -I$(src)/mainboard/$(MAINBOARDDIR)/variants/$(VARIANT_DIR)/include
 diff --git a/src/mainboard/purism/librem_whl/acpi/mainboard.asl b/src/mainboard/purism/librem_whl/acpi/mainboard.asl
 new file mode 100644
-index 0000000000..999030d2e5
+index 0000000000..0c9a76b168
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/acpi/mainboard.asl
 @@ -0,0 +1,16 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +
-+Scope (\_SB.PCI0.LPCB) {
-+
++Scope (\_SB.PCI0.LPCB)
++{
 +	Device (AC)
 +	{
 +		Name (_HID, "ACPI0003")
@@ -164,10 +169,10 @@ index 0000000000..e72dcdf2b7
 +Flashrom support: y
 diff --git a/src/mainboard/purism/librem_whl/devicetree.cb b/src/mainboard/purism/librem_whl/devicetree.cb
 new file mode 100644
-index 0000000000..e67d910322
+index 0000000000..c122bb8982
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/devicetree.cb
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,315 @@
 +chip soc/intel/cannonlake
 +	# Lock Down
 +	register "common_soc_config" = "{
@@ -301,10 +306,6 @@ index 0000000000..e67d910322
 +	register "PcieRpLtrEnable[12]" = "1"
 +
 +	# Misc
-+	register "Device4Enable" = "1"
-+	# HECI must be enabled w/HAP disable else S3 issues
-+	register "HeciEnabled" = "1"
-+	register "Heci3Enabled" = "0"
 +	register "AcousticNoiseMitigation" = "1"
 +	register "satapwroptimize" = "1"
 +
@@ -342,27 +343,123 @@ index 0000000000..e67d910322
 +	device domain 0 on
 +		device pci 00.0 on  end # Host Bridge
 +		device pci 02.0 on  end # Integrated Graphics Device
-+		device pci 04.0 on  end # SA Thermal device
++		device pci 04.0 on	# SA Thermal device
++			register "Device4Enable" = "1"
++		end
 +		device pci 12.0 on  end # Thermal Subsystem
 +		device pci 13.0 off end # Integrated Sensor Hub
-+		device pci 14.0 on  end # USB xHCI
++		device pci 14.0 on	# USB xHCI
++			chip drivers/usb/acpi
++				device usb 0.0 on
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Front Left Upper""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(0, 0)"
++						device usb 2.0 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Front Left Lower""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(0, 1)"
++						device usb 2.1 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Rear Upper""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(1, 0)"
++						device usb 2.2 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Front Right Lower""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(0, 2)"
++						device usb 2.3 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Front Right Upper""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(0, 3)"
++						device usb 2.4 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-C Port Rear""
++						register "type" = "UPC_TYPE_C_USB2_SS_SWITCH"
++						register "group" = "ACPI_PLD_GROUP(1, 2)"
++						device usb 2.5 on end
++					end
++					chip drivers/usb/acpi
++						device usb 2.6 off end
++					end
++					chip drivers/usb/acpi
++						device usb 2.7 off end
++					end
++					chip drivers/usb/acpi
++						device usb 2.8 off end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB2 Type-A Rear Lower""
++						register "type" = "UPC_TYPE_A"
++						register "group" = "ACPI_PLD_GROUP(1, 1)"
++						device usb 2.9 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB3 Type-A Front Left Upper""
++						register "type" = "UPC_TYPE_USB3_A"
++						register "group" = "ACPI_PLD_GROUP(0, 0)"
++						device usb 3.0 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB3 Type-A Front Left Lower""
++						register "type" = "UPC_TYPE_USB3_A"
++						register "group" = "ACPI_PLD_GROUP(0, 1)"
++						device usb 3.1 on end
++					end
++					chip drivers/usb/acpi
++						device usb 3.2 off end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB3 Type-C Rear""
++						register "type" = "UPC_TYPE_C_USB2_SS_SWITCH"
++						register "group" = "ACPI_PLD_GROUP(1, 2)"
++						device usb 3.3 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB3 Type-A Rear Lower""
++						register "type" = "UPC_TYPE_USB3_A"
++						register "group" = "ACPI_PLD_GROUP(1, 1)"
++						device usb 3.4 on end
++					end
++					chip drivers/usb/acpi
++						register "desc" = ""USB3 Type-A Rear Upper""
++						register "type" = "UPC_TYPE_USB3_A"
++						register "group" = "ACPI_PLD_GROUP(1, 0)"
++						device usb 3.5 on end
++					end
++				end
++			end
++		end
 +		device pci 14.1 off end # USB xDCI (OTG)
 +		device pci 15.0 off end # I2C #0
 +		device pci 15.1 off end # I2C #1
 +		device pci 15.2 off end # I2C #2
 +		device pci 15.3 off end # I2C #3
-+		device pci 16.0 off end # Management Engine Interface 1
++		device pci 16.0 off	# Management Engine Interface 1
++			# HECI must be enabled w/HAP disable else S3 issues
++			register "HeciEnabled" = "1"
++		end
 +		device pci 16.1 off end # Management Engine Interface 2
 +		device pci 16.2 off end # Management Engine IDE-R
 +		device pci 16.3 off end # Management Engine KT Redirection
-+		device pci 16.4 off end # Management Engine Interface 3
++		device pci 16.4 off	# Management Engine Interface 3
++			register "Heci3Enabled" = "0"
++		end
 +		device pci 16.5 off end # Management Engine Interface 4
 +		device pci 17.0 on  end # SATA
 +		device pci 19.0 off end # I2C #4
 +		device pci 19.1 off end # I2C #5
 +		device pci 19.2 off end # UART #2
 +		device pci 1a.0 off end # eMMC
-+		device pci 1c.0 on  end # PCI Express Port 1
++		device pci 1c.0 off end # PCI Express Port 1
 +		device pci 1c.1 off end # PCI Express Port 2
 +		device pci 1c.2 off end # PCI Express Port 3
 +		device pci 1c.3 off end # PCI Express Port 4
@@ -370,7 +467,7 @@ index 0000000000..e67d910322
 +		device pci 1c.5 off end # PCI Express Port 6
 +		device pci 1c.6 off end # PCI Express Port 7
 +		device pci 1c.7 on  end # PCI Express Port 8  (WLAN)
-+		device pci 1d.0 on  end # PCI Express Port 9
++		device pci 1d.0 off end # PCI Express Port 9
 +		device pci 1d.1 on  end # PCI Express Port 10 (LAN)
 +		device pci 1d.2 off end # PCI Express Port 11
 +		device pci 1d.3 off end # PCI Express Port 12
@@ -425,10 +522,10 @@ index 0000000000..296be17b35
 +}
 diff --git a/src/mainboard/purism/librem_whl/ramstage.c b/src/mainboard/purism/librem_whl/ramstage.c
 new file mode 100644
-index 0000000000..3479c0d3ed
+index 0000000000..56ed1b7844
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/ramstage.c
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,13 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +
 +#include <soc/ramstage.h>
@@ -441,16 +538,13 @@ index 0000000000..3479c0d3ed
 +	size_t num_gpios;
 +	const struct pad_config *gpio_table = variant_gpio_table(&num_gpios);
 +	cnl_configure_pads(gpio_table, num_gpios);
-+
-+	/* Limit SATA speed to 3Gbps */
-+	params->SataSpeedLimit = 2;
 +}
 diff --git a/src/mainboard/purism/librem_whl/romstage.c b/src/mainboard/purism/librem_whl/romstage.c
 new file mode 100644
-index 0000000000..9f8d600950
+index 0000000000..3a3ca6b491
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/romstage.c
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,59 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +
 +#include <soc/cnl_memcfg_init.h>
@@ -501,236 +595,805 @@ index 0000000000..9f8d600950
 +
 +void mainboard_memory_init_params(FSPM_UPD *memupd)
 +{
-+	cannonlake_memcfg_init(&memupd->FspmConfig, &memcfg);
++	FSP_M_CONFIG *mem_cfg = &memupd->FspmConfig;
++	cannonlake_memcfg_init(mem_cfg, &memcfg);
++
++	/* Enable and set SATA HSIO adjustments for ports 0 and 2 */
++	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[0] = 1;
++	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[2] = 1;
++	mem_cfg->PchSataHsioRxGen3EqBoostMag[0] = 2;
++	mem_cfg->PchSataHsioRxGen3EqBoostMag[2] = 1;
 +}
 diff --git a/src/mainboard/purism/librem_whl/variants/librem_mini/gpio.c b/src/mainboard/purism/librem_whl/variants/librem_mini/gpio.c
 new file mode 100644
-index 0000000000..a5b2dcafa3
+index 0000000000..254510ead5
 --- /dev/null
 +++ b/src/mainboard/purism/librem_whl/variants/librem_mini/gpio.c
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,791 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +
 +#include <variant/gpio.h>
 +
-+/* Pad configuration in ramstage. */
++/* Pad configuration was generated automatically using intelp2m utility */
 +static const struct pad_config gpio_table[] = {
 +
-+/* ------- GPIO Group GPP_A ------- */
++	/* ------- GPIO Community 0 ------- */
 +
-+_PAD_CFG_STRUCT(GPP_A0,  0x44000702, 0x0000),	/* RCIN#               */
-+_PAD_CFG_STRUCT(GPP_A1,  0x44000702, 0x3c00),	/* LAD0                */
-+_PAD_CFG_STRUCT(GPP_A2,  0x44000702, 0x3c00),	/* LAD1                */
-+_PAD_CFG_STRUCT(GPP_A3,  0x44000702, 0x3c00),	/* LAD2                */
-+_PAD_CFG_STRUCT(GPP_A4,  0x44000702, 0x3c00),	/* LAD3                */
-+_PAD_CFG_STRUCT(GPP_A5,  0x44000700, 0x0000),	/* LFRAME#             */
-+_PAD_CFG_STRUCT(GPP_A6,  0x44000700, 0x0000),	/* SERIRQ              */
-+_PAD_CFG_STRUCT(GPP_A7,  0x84000200, 0x0000),	/* PIRQA#              */
-+_PAD_CFG_STRUCT(GPP_A8,  0x44000700, 0x0000),	/* CLKRUN#             */
-+_PAD_CFG_STRUCT(GPP_A9,  0x44000700, 0x1000),	/* CLKOUT_LPC0         */
-+_PAD_CFG_STRUCT(GPP_A10, 0x44000700, 0x1000),	/* CLKOUT_LPC1         */
-+_PAD_CFG_STRUCT(GPP_A11, 0x40880201, 0x0000),	/* PME#                */
-+_PAD_CFG_STRUCT(GPP_A12, 0x84000201, 0x0000),	/* BM_BUSY#            */
-+_PAD_CFG_STRUCT(GPP_A13, 0x84000201, 0x0000),	/* SUSWARN#/SUSPWRDNACK*/
-+_PAD_CFG_STRUCT(GPP_A14, 0x44000700, 0x0000),	/* SUS_STAT#           */
-+_PAD_CFG_STRUCT(GPP_A15, 0x84000201, 0x0000),	/* SUSACK#             */
-+_PAD_CFG_STRUCT(GPP_A16, 0x84000200, 0x3000),	/* SD_1P8_SEL          */
-+_PAD_CFG_STRUCT(GPP_A17, 0x84000201, 0x0000),	/* SD_VDD1_PWR_EN#     */
-+_PAD_CFG_STRUCT(GPP_A18, 0x44000300, 0x3000),	/* ISH_GP0             */
-+_PAD_CFG_STRUCT(GPP_A19, 0x44000300, 0x3000),	/* ISH_GP1             */
-+_PAD_CFG_STRUCT(GPP_A20, 0x44000300, 0x3000),	/* ISH_GP2             */
-+_PAD_CFG_STRUCT(GPP_A21, 0x44000300, 0x3000),	/* ISH_GP3             */
-+_PAD_CFG_STRUCT(GPP_A22, 0x44000300, 0x3000),	/* ISH_GP4             */
-+_PAD_CFG_STRUCT(GPP_A23, 0x44000300, 0x3000),	/* ISH_GP5             */
++	/* ------- GPIO Group GPP_A ------- */
 +
-+/* ------- GPIO Group GPP_B ------- */
++	/* GPP_A0 - RCIN# */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_A0, NONE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_B0,  0x84000700, 0x0000),	/* Reserved            */
-+_PAD_CFG_STRUCT(GPP_B1,  0x84000700, 0x0000),	/* Reserved            */
-+_PAD_CFG_STRUCT(GPP_B2,  0x84000201, 0x0000),	/* VRALERT#            */
-+_PAD_CFG_STRUCT(GPP_B3,  0x84000201, 0x0000),	/* CPU_GP2             */
-+_PAD_CFG_STRUCT(GPP_B4,  0x84000201, 0x0000),	/* CPU_GP3             */
-+_PAD_CFG_STRUCT(GPP_B5,  0x44000300, 0x0000),	/* SRCCLKREQ0#         */
-+_PAD_CFG_STRUCT(GPP_B6,  0x44000300, 0x0000),	/* SRCCLKREQ1#         */
-+_PAD_CFG_STRUCT(GPP_B7,  0x44000300, 0x0000),	/* SRCCLKREQ2#         */
-+_PAD_CFG_STRUCT(GPP_B8,  0x44000300, 0x0000),	/* SRCCLKREQ3#         */
-+_PAD_CFG_STRUCT(GPP_B9,  0x44000300, 0x0000),	/* SRCCLKREQ4#         */
-+_PAD_CFG_STRUCT(GPP_B10, 0x44000300, 0x0000),	/* SRCCLKREQ5#         */
-+_PAD_CFG_STRUCT(GPP_B11, 0x84000201, 0x0000),	/* EXT_PWR_GATE#       */
-+_PAD_CFG_STRUCT(GPP_B12, 0x44000700, 0x0000),	/* SLP_S0#             */
-+_PAD_CFG_STRUCT(GPP_B13, 0x44000700, 0x0000),	/* PLTRST#             */
-+_PAD_CFG_STRUCT(GPP_B14, 0x84000201, 0x0000),	/* SPKR                */
-+_PAD_CFG_STRUCT(GPP_B15, 0x80000701, 0x0000),	/* GSPI0_CS0#          */
-+_PAD_CFG_STRUCT(GPP_B16, 0x84000601, 0x0000),	/* GSPI0_CLK           */
-+_PAD_CFG_STRUCT(GPP_B17, 0x44000502, 0x0000),	/* GSPI0_MISO          */
-+_PAD_CFG_STRUCT(GPP_B18, 0x84000601, 0x0000),	/* GSPI0_MOSI          */
-+_PAD_CFG_STRUCT(GPP_B19, 0x84000400, 0x0000),	/* GSPI1_CS0#          */
-+_PAD_CFG_STRUCT(GPP_B20, 0x84000400, 0x0000),	/* GSPI1_CLK           */
-+_PAD_CFG_STRUCT(GPP_B21, 0x84000402, 0x0000),	/* GSPI1_MISO          */
-+_PAD_CFG_STRUCT(GPP_B22, 0x84000400, 0x0000),	/* GSPI1_MOSI          */
-+_PAD_CFG_STRUCT(GPP_B23, 0x44000201, 0x0000),	/* SML1ALERT#          */
++	/* GPP_A1 - LAD0 */
++	/* DW0: 0x44000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPP_A1, NATIVE, DEEP, NF1),
 +
-+/* ------- GPIO Group GPP_G ------- */
++	/* GPP_A2 - LAD1 */
++	/* DW0: 0x44000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPP_A2, NATIVE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_G0,  0x84000200, 0x0000),	/* SD_CMD              */
-+_PAD_CFG_STRUCT(GPP_G1,  0x84000300, 0x0000),	/* SD_DATA0            */
-+_PAD_CFG_STRUCT(GPP_G2,  0x84000300, 0x0000),	/* SD_DATA1            */
-+_PAD_CFG_STRUCT(GPP_G3,  0x84000300, 0x0000),	/* SD_DATA2            */
-+_PAD_CFG_STRUCT(GPP_G4,  0x84000300, 0x0000),	/* SD_DATA3            */
-+_PAD_CFG_STRUCT(GPP_G5,  0x84000300, 0x3000),	/* SD3_CD#             */
-+_PAD_CFG_STRUCT(GPP_G6,  0x84000300, 0x0000),	/* SD3_CLK             */
-+_PAD_CFG_STRUCT(GPP_G7,  0x84000300, 0x1000),	/* SD3_WP              */
++	/* GPP_A3 - LAD2 */
++	/* DW0: 0x44000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPP_A3, NATIVE, DEEP, NF1),
 +
-+/* ------- GPIO Group GPP_D ------- */
++	/* GPP_A4 - LAD3 */
++	/* DW0: 0x44000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPP_A4, NATIVE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_D0,  0x44000300, 0x0000),	/* SPI1_CS#            */
-+_PAD_CFG_STRUCT(GPP_D1,  0x44000300, 0x0000),	/* SPI1_CLK            */
-+_PAD_CFG_STRUCT(GPP_D2,  0x44000300, 0x0000),	/* SPI1_MISO           */
-+_PAD_CFG_STRUCT(GPP_D3,  0x44000300, 0x0000),	/* SPI1_MOSI           */
-+_PAD_CFG_STRUCT(GPP_D4,  0x44000300, 0x0000),	/* IMGCLKOUT0          */
-+_PAD_CFG_STRUCT(GPP_D5,  0x44000700, 0x0000),	/* ISH_I2C0_SDA        */
-+_PAD_CFG_STRUCT(GPP_D6,  0x44000700, 0x0000),	/* ISH_I2C0_SCL        */
-+_PAD_CFG_STRUCT(GPP_D7,  0x84000201, 0x0000),	/* ISH_I2C1_SDA        */
-+_PAD_CFG_STRUCT(GPP_D8,  0x84000200, 0x0000),	/* ISH_I2C1_SCL        */
-+_PAD_CFG_STRUCT(GPP_D9,  0x84000201, 0x0000),	/* ISH_SPI_CS#         */
-+_PAD_CFG_STRUCT(GPP_D10, 0x84000201, 0x0000),	/* ISH_SPI_CLK         */
-+_PAD_CFG_STRUCT(GPP_D11, 0x44000201, 0x3000),	/* ISH_SPI_MISO        */
-+_PAD_CFG_STRUCT(GPP_D12, 0x42100102, 0x3000),	/* ISH_SPI_MOSI        */
-+_PAD_CFG_STRUCT(GPP_D13, 0x44000201, 0x0000),	/* ISH_UART0_RXD       */
-+_PAD_CFG_STRUCT(GPP_D14, 0x84000201, 0x0000),	/* ISH_UART0_TXD       */
-+_PAD_CFG_STRUCT(GPP_D15, 0x84000201, 0x0000),	/* ISH_UART0_RTS#      */
-+_PAD_CFG_STRUCT(GPP_D16, 0x44000200, 0x0000),	/* ISH_UART0_CTS#      */
-+_PAD_CFG_STRUCT(GPP_D17, 0x44000700, 0x0000),	/* DMIC_CLK1           */
-+_PAD_CFG_STRUCT(GPP_D18, 0x44000700, 0x0000),	/* DMIC_DATA1          */
-+_PAD_CFG_STRUCT(GPP_D19, 0x44000700, 0x0000),	/* DMIC_CLK0           */
-+_PAD_CFG_STRUCT(GPP_D20, 0x44000700, 0x0000),	/* DMIC_DATA0          */
-+_PAD_CFG_STRUCT(GPP_D21, 0x44000300, 0x0000),	/* SPI1_IO2            */
-+_PAD_CFG_STRUCT(GPP_D22, 0x44000300, 0x0000),	/* SPI1_IO3            */
-+_PAD_CFG_STRUCT(GPP_D23, 0x44000300, 0x0000),	/* I2S_MCLK            */
++	/* GPP_A5 - LFRAME# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_A5, NONE, DEEP, NF1),
 +
-+/* ------- GPIO Group GPP_F ------- */
++	/* GPP_A6 - SERIRQ */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_A6, NONE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_F0,  0x84000301, 0x0000),	/* CNV_PA_BLANKING     */
-+_PAD_CFG_STRUCT(GPP_F1,  0x84000200, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_F2,  0x84000201, 0x3000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_F3,  0x84000200, 0x3000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_F4,  0x44000700, 0x3000),	/* CNV_BRI_DT          */
-+_PAD_CFG_STRUCT(GPP_F5,  0x44000702, 0x3000),	/* CNV_BRI_RSP         */
-+_PAD_CFG_STRUCT(GPP_F6,  0x44000700, 0x3000),	/* CNV_RGI_DT          */
-+_PAD_CFG_STRUCT(GPP_F7,  0x44000702, 0x3000),	/* CNV_RGI_RSP         */
-+_PAD_CFG_STRUCT(GPP_F8,  0x44000300, 0x0000),	/* CNV_MFUART2_RXD     */
-+_PAD_CFG_STRUCT(GPP_F9,  0x44000300, 0x0000),	/* CNV_MFUART2_TXD     */
-+_PAD_CFG_STRUCT(GPP_F10, 0x84000201, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_F11, 0x44000300, 0x0000),	/* EMMC_CMD            */
-+_PAD_CFG_STRUCT(GPP_F12, 0x44000300, 0x0000),	/* EMMC_DATA0          */
-+_PAD_CFG_STRUCT(GPP_F13, 0x44000300, 0x0000),	/* EMMC_DATA1          */
-+_PAD_CFG_STRUCT(GPP_F14, 0x44000300, 0x0000),	/* EMMC_DATA2          */
-+_PAD_CFG_STRUCT(GPP_F15, 0x44000300, 0x0000),	/* EMMC_DATA3          */
-+_PAD_CFG_STRUCT(GPP_F16, 0x44000300, 0x0000),	/* EMMC_DATA4          */
-+_PAD_CFG_STRUCT(GPP_F17, 0x44000300, 0x0000),	/* EMMC_DATA5          */
-+_PAD_CFG_STRUCT(GPP_F18, 0x44000300, 0x0000),	/* EMMC_DATA6          */
-+_PAD_CFG_STRUCT(GPP_F19, 0x44000300, 0x0000),	/* EMMC_DATA7          */
-+_PAD_CFG_STRUCT(GPP_F20, 0x44000300, 0x0000),	/* EMMC_RCLK           */
-+_PAD_CFG_STRUCT(GPP_F21, 0x44000300, 0x0000),	/* EMMC_CLK            */
-+_PAD_CFG_STRUCT(GPP_F22, 0x44000300, 0x0000),	/* EMMC_RESET#         */
-+_PAD_CFG_STRUCT(GPP_F23, 0x44000700, 0x1000),	/* A4WP_PRESENT        */
++	/* GPP_A7 - GPIO */
++	/* DW0: 0x44000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A7, 0, DEEP),
 +
-+/* ------- GPIO Group GPP_H ------- */
++	/* GPP_A8 - CLKRUN# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_A8, NONE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_H0,  0x44000300, 0x3000),	/* I2S2_SCLK           */
-+_PAD_CFG_STRUCT(GPP_H1,  0x44000f00, 0x3000),	/* CNV_RF_RESET#       */
-+_PAD_CFG_STRUCT(GPP_H2,  0x84000f00, 0x3000),	/* MODEM_CLKREQ        */
-+_PAD_CFG_STRUCT(GPP_H3,  0x84000300, 0x3000),	/* I2S2_RXD            */
-+_PAD_CFG_STRUCT(GPP_H4,  0x84000300, 0x0000),	/* I2C2_SDA            */
-+_PAD_CFG_STRUCT(GPP_H5,  0x84000300, 0x0000),	/* I2C2_SCL            */
-+_PAD_CFG_STRUCT(GPP_H6,  0x84000702, 0x0000),	/* I2C3_SDA            */
-+_PAD_CFG_STRUCT(GPP_H7,  0x84000702, 0x0000),	/* I2C3_SCL            */
-+_PAD_CFG_STRUCT(GPP_H8,  0x84000702, 0x0000),	/* I2C4_SDA            */
-+_PAD_CFG_STRUCT(GPP_H9,  0x84000702, 0x0000),	/* I2C4_SCL            */
-+_PAD_CFG_STRUCT(GPP_H10, 0x84000603, 0x0000),	/* I2C5_SDA            */
-+_PAD_CFG_STRUCT(GPP_H11, 0x84000603, 0x0000),	/* I2C5_SCL            */
-+_PAD_CFG_STRUCT(GPP_H12, 0x84000201, 0x0000),	/* M2_SKT2_CFG0        */
-+_PAD_CFG_STRUCT(GPP_H13, 0x84000201, 0x0000),	/* M2_SKT2_CFG1        */
-+_PAD_CFG_STRUCT(GPP_H14, 0x84000200, 0x0000),	/* M2_SKT2_CFG2        */
-+_PAD_CFG_STRUCT(GPP_H15, 0x84000201, 0x0000),	/* M2_SKT2_CFG3        */
-+_PAD_CFG_STRUCT(GPP_H16, 0x84000201, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_H17, 0x84000201, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_H18, 0x84000700, 0x0000),	/* CPU_C10_GATE#       */
-+_PAD_CFG_STRUCT(GPP_H19, 0x84000201, 0x0000),	/* TIME_SYNC0          */
-+_PAD_CFG_STRUCT(GPP_H20, 0x84000300, 0x0000),	/* IMGCLKOUT1          */
-+_PAD_CFG_STRUCT(GPP_H21, 0x84000200, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_H22, 0x84000201, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_H23, 0x84000200, 0x0000),	/* GPIO                */
++	/* GPP_A9 - CLKOUT_LPC0 */
++	/* DW0: 0x44000700, DW1: 0x00001000 */
++	PAD_CFG_NF(GPP_A9, DN_20K, DEEP, NF1),
 +
-+/* ------- GPIO Group GPD ------- */
++	/* GPP_A10 - CLKOUT_LPC1 */
++	/* DW0: 0x44000700, DW1: 0x00001000 */
++	PAD_CFG_NF(GPP_A10, DN_20K, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPD0,  0x44000702, 0x0000),	/* BATLOW#             */
-+_PAD_CFG_STRUCT(GPD1,  0x44000702, 0x3c00),	/* ACPRESENT           */
-+_PAD_CFG_STRUCT(GPD2,  0x44000702, 0x3c00),	/* LAN_WAKE#           */
-+_PAD_CFG_STRUCT(GPD3,  0x44000702, 0x3000),	/* PRWBTN#             */
-+_PAD_CFG_STRUCT(GPD4,  0x44000600, 0x0000),	/* SLP_S3#             */
-+_PAD_CFG_STRUCT(GPD5,  0x44000600, 0x0000),	/* SLP_S4#             */
-+_PAD_CFG_STRUCT(GPD6,  0x44000600, 0x0000),	/* SLP_A#              */
-+_PAD_CFG_STRUCT(GPD7,  0x44000200, 0x0000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPD8,  0x44000700, 0x0000),	/* SUSCLK              */
-+_PAD_CFG_STRUCT(GPD9,  0x44000700, 0x0000),	/* SLP_WLAN#           */
-+_PAD_CFG_STRUCT(GPD10, 0x44000600, 0x0000),	/* SLP_S5#             */
-+_PAD_CFG_STRUCT(GPD11, 0x44000600, 0x0000),	/* LANPHYPC            */
++	/* GPP_A11 - GPIO */
++	/* DW0: 0x80880201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A11, 1, PLTRST),
 +
-+/* ------- GPIO Group GPP_C ------- */
++	/* GPP_A12 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A12, 1, PLTRST),
 +
-+_PAD_CFG_STRUCT(GPP_C0,  0x44000702, 0x0000),	/* SMBCLK              */
-+_PAD_CFG_STRUCT(GPP_C1,  0x44000702, 0x0000),	/* SMBDATA             */
-+_PAD_CFG_STRUCT(GPP_C2,  0x44000201, 0x0000),	/* SMBALERT#           */
-+_PAD_CFG_STRUCT(GPP_C3,  0x44000702, 0x0000),	/* SML0CLK             */
-+_PAD_CFG_STRUCT(GPP_C4,  0x44000702, 0x0000),	/* SML0DATA            */
-+_PAD_CFG_STRUCT(GPP_C5,  0x84000201, 0x0000),	/* SML0ALERT#          */
-+_PAD_CFG_STRUCT(GPP_C6,  0x44000300, 0x0000),	/* SML1CLK             */
-+_PAD_CFG_STRUCT(GPP_C7,  0x44000300, 0x0000),	/* SML1DATA            */
-+_PAD_CFG_STRUCT(GPP_C8,  0x84000201, 0x0000),	/* UART0_RXD           */
-+_PAD_CFG_STRUCT(GPP_C9,  0x84000201, 0x0000),	/* UART0_TXD           */
-+_PAD_CFG_STRUCT(GPP_C10, 0x84000200, 0x0000),	/* UART0_RTS#          */
-+_PAD_CFG_STRUCT(GPP_C11, 0x84000201, 0x0000),	/* UART0_CTS#          */
-+_PAD_CFG_STRUCT(GPP_C12, 0x84000603, 0x0000),	/* UART1_RXD           */
-+_PAD_CFG_STRUCT(GPP_C13, 0x84000700, 0x0000),	/* UART1_TXD           */
-+_PAD_CFG_STRUCT(GPP_C14, 0x84000700, 0x0000),	/* UART1_RTS#          */
-+_PAD_CFG_STRUCT(GPP_C15, 0x84000702, 0x0000),	/* UART1_CTS#          */
-+_PAD_CFG_STRUCT(GPP_C16, 0x84000402, 0x0000),	/* I2C0_SDA            */
-+_PAD_CFG_STRUCT(GPP_C17, 0x84000402, 0x0000),	/* I2C0_SCL            */
-+_PAD_CFG_STRUCT(GPP_C18, 0x44000702, 0x0000),	/* I2C1_SDA            */
-+_PAD_CFG_STRUCT(GPP_C19, 0x44000702, 0x0000),	/* I2C1_SCL            */
-+_PAD_CFG_STRUCT(GPP_C20, 0x44000300, 0x0000),	/* UART2_RXD           */
-+_PAD_CFG_STRUCT(GPP_C21, 0x44000300, 0x0000),	/* UART2_TXD           */
-+_PAD_CFG_STRUCT(GPP_C22, 0x84000201, 0x0000),	/* UART2_RTS#          */
-+_PAD_CFG_STRUCT(GPP_C23, 0x40100102, 0x1000),	/* UART2_CTS#          */
++	/* GPP_A13 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A13, 1, PLTRST),
 +
-+/* ------- GPIO Group GPP_E ------- */
++	/* GPP_A14 - SUS_STAT# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_A14, NONE, DEEP, NF1),
 +
-+_PAD_CFG_STRUCT(GPP_E0,  0x84000300, 0x0000),	/* SATAXPCIE0          */
-+_PAD_CFG_STRUCT(GPP_E1,  0x84000300, 0x0000),	/* SATAXPCIE1          */
-+_PAD_CFG_STRUCT(GPP_E2,  0x84000502, 0x3000),	/* SATAXPCIE2          */
-+_PAD_CFG_STRUCT(GPP_E3,  0x82040102, 0x0000),	/* CPU_GP0             */
-+_PAD_CFG_STRUCT(GPP_E4,  0x84000201, 0x0000),	/* SATA_DEVSLP0        */
-+_PAD_CFG_STRUCT(GPP_E5,  0x84000300, 0x0000),	/* SATA_DEVSLP1        */
-+_PAD_CFG_STRUCT(GPP_E6,  0x84000300, 0x0000),	/* SATA_DEVSLP2        */
-+_PAD_CFG_STRUCT(GPP_E7,  0x82000102, 0x0000),	/* CPU_GP1             */
-+_PAD_CFG_STRUCT(GPP_E8,  0x84000700, 0x0000),	/* SATALED#            */
-+_PAD_CFG_STRUCT(GPP_E9,  0x44001700, 0x0000),	/* USB2_OC0#            */
-+_PAD_CFG_STRUCT(GPP_E10, 0x44001700, 0x0000),	/* USB2_OC1#            */
-+_PAD_CFG_STRUCT(GPP_E11, 0x44000702, 0x0000),	/* USB2_OC2#           */
-+_PAD_CFG_STRUCT(GPP_E12, 0x44000702, 0x0000),	/* USB2_OC3#           */
-+_PAD_CFG_STRUCT(GPP_E13, 0x84000700, 0x0000),	/* DDPB_HPD0           */
-+_PAD_CFG_STRUCT(GPP_E14, 0x84000702, 0x0000),	/* DDPC_HPD1           */
-+_PAD_CFG_STRUCT(GPP_E15, 0x84000201, 0x0000),	/* DDPD_HPD2           */
-+_PAD_CFG_STRUCT(GPP_E16, 0x80880102, 0x3000),	/* GPIO                */
-+_PAD_CFG_STRUCT(GPP_E17, 0x84000700, 0x0000),	/* EDP_HPD             */
-+_PAD_CFG_STRUCT(GPP_E18, 0x84000702, 0x0000),	/* DPPB_CTRLCLK        */
-+_PAD_CFG_STRUCT(GPP_E19, 0x84000602, 0x0000),	/* DPPB_CTRLDATA       */
-+_PAD_CFG_STRUCT(GPP_E20, 0x84000700, 0x0000),	/* DPPC_CTRLCLK        */
-+_PAD_CFG_STRUCT(GPP_E21, 0x84000602, 0x0000),	/* DPPC_CTRLDATA       */
-+_PAD_CFG_STRUCT(GPP_E22, 0x84000702, 0x0000),	/* DPPD_CTRLCLK        */
-+_PAD_CFG_STRUCT(GPP_E23, 0x84000602, 0x0000),	/* DPPD_CTRLDATA       */
++	/* GPP_A15 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A15, 1, PLTRST),
 +
++	/* GPP_A16 - GPIO */
++	/* DW0: 0x84000200, DW1: 0x00003000 */
++	PAD_CFG_TERM_GPO(GPP_A16, 0, UP_20K, PLTRST),
++
++	/* GPP_A17 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_A17, 1, PLTRST),
++
++	/* GPP_A18 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A18, UP_20K),
++
++	/* GPP_A19 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A19, UP_20K),
++
++	/* GPP_A20 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A20, UP_20K),
++
++	/* GPP_A21 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A21, UP_20K),
++
++	/* GPP_A22 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A22, UP_20K),
++
++	/* GPP_A23 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_A23, UP_20K),
++
++	/* ------- GPIO Group GPP_B ------- */
++
++	/* GPP_B0 - Reserved */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B0, NONE, DEEP, NF1),
++
++	/* GPP_B1 - Reserved */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B1, NONE, DEEP, NF1),
++
++	/* GPP_B2 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B2, 1, PLTRST),
++
++	/* GPP_B3 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B3, 1, PLTRST),
++
++	/* GPP_B4 - GPIO */
++	/* DW0: 0x44000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B4, 1, DEEP),
++
++	/* GPP_B5 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B5, NONE),
++
++	/* GPP_B6 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B6, NONE),
++
++	/* GPP_B7 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B7, NONE),
++
++	/* GPP_B8 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B8, NONE),
++
++	/* GPP_B9 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B9, NONE),
++
++	/* GPP_B10 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_B10, NONE),
++
++	/* GPP_B11 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B11, 1, PLTRST),
++
++	/* GPP_B12 - SLP_S0# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B12, NONE, DEEP, NF1),
++
++	/* GPP_B13 - PLTRST# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B13, NONE, DEEP, NF1),
++
++	/* GPP_B14 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B14, 1, PLTRST),
++
++	/* GPP_B15 - GSPI0_CS0# */
++	/* DW0: 0x00000701, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B15, NONE, PWROK, NF1),
++
++	/* GPP_B16 - GSPI0_CLK */
++	/* DW0: 0x84000601, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B16, NONE, PLTRST, NF1),
++
++	/* GPP_B17 - GSPI0_MISO */
++	/* DW0: 0x44000502, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B17, NONE, DEEP, NF1),
++
++	/* GPP_B18 - GSPI0_MOSI */
++	/* DW0: 0x84000601, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B18, NONE, PLTRST, NF1),
++
++	/* GPP_B19 - GSPI1_CS0# */
++	/* DW0: 0x84000400, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B19, NONE, PLTRST, NF1),
++
++	/* GPP_B20 - GSPI1_CLK */
++	/* DW0: 0x84000400, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B20, NONE, PLTRST, NF1),
++
++	/* GPP_B21 - GSPI1_MISO */
++	/* DW0: 0x84000402, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B21, NONE, PLTRST, NF1),
++
++	/* GPP_B22 - GSPI1_MOSI */
++	/* DW0: 0x84000400, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_B22, NONE, PLTRST, NF1),
++
++	/* GPP_B23 - GPIO */
++	/* DW0: 0x44000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_B23, 1, DEEP),
++
++	/* ------- GPIO Group GPP_G ------- */
++
++	/* GPP_G0 - GPIO */
++	/* DW0: 0x04000200, DW1: 0x00001000 */
++	PAD_CFG_TERM_GPO(GPP_G0, 0, DN_20K, PWROK),
++
++	/* GPP_G1 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_G1, NONE),
++
++	/* GPP_G2 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_G2, NONE),
++
++	/* GPP_G3 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_G3, NONE),
++
++	/* GPP_G4 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_G4, NONE),
++
++	/* GPP_G5 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_G5, UP_20K),
++
++	/* GPP_G6 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_G6, NONE),
++
++	/* GPP_G7 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00001000 */
++	PAD_NC(GPP_G7, DN_20K),
++
++	/* ------- GPIO Community 1 ------- */
++
++	/* ------- GPIO Group GPP_D ------- */
++
++	/* GPP_D0 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D0, NONE),
++
++	/* GPP_D1 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D1, NONE),
++
++	/* GPP_D2 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D2, NONE),
++
++	/* GPP_D3 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D3, NONE),
++
++	/* GPP_D4 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D4, NONE),
++
++	/* GPP_D5 - ISH_I2C0_SDA */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D5, NONE, DEEP, NF1),
++
++	/* GPP_D6 - ISH_I2C0_SCL */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D6, NONE, DEEP, NF1),
++
++	/* GPP_D7 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D7, 1, PLTRST),
++
++	/* GPP_D8 - GPIO */
++	/* DW0: 0x84000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D8, 0, PLTRST),
++
++	/* GPP_D9 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D9, 1, PLTRST),
++
++	/* GPP_D10 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D10, 1, PLTRST),
++
++	/* GPP_D11 - GPIO */
++	/* DW0: 0x44000201, DW1: 0x00003000 */
++	PAD_CFG_TERM_GPO(GPP_D11, 1, UP_20K, DEEP),
++
++	/* GPP_D12 - GPIO */
++	/* DW0: 0x42100102, DW1: 0x00003000 */
++	PAD_CFG_GPI_APIC(GPP_D12, UP_20K, DEEP, EDGE_SINGLE, NONE),
++
++	/* GPP_D13 - GPIO */
++	/* DW0: 0x04000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D13, 1, RSMRST),
++
++	/* GPP_D14 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D14, 1, PLTRST),
++
++	/* GPP_D15 - GPIO */
++	/* DW0: 0x44000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D15, 1, DEEP),
++
++	/* GPP_D16 - GPIO */
++	/* DW0: 0x04000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_D16, 0, RSMRST),
++
++	/* GPP_D17 - DMIC_CLK1 */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D17, NONE, DEEP, NF1),
++
++	/* GPP_D18 - DMIC_DATA1 */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D18, NONE, DEEP, NF1),
++
++	/* GPP_D19 - DMIC_CLK0 */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D19, NONE, DEEP, NF1),
++
++	/* GPP_D20 - DMIC_DATA0 */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_D20, NONE, DEEP, NF1),
++
++	/* GPP_D21 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D21, NONE),
++
++	/* GPP_D22 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D22, NONE),
++
++	/* GPP_D23 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_D23, NONE),
++
++	/* ------- GPIO Group GPP_F ------- */
++
++	/* GPP_F0 - GPIO */
++	/* DW0: 0x00000301, DW1: 0x00000000 */
++	PAD_NC(GPP_F0, NONE),
++
++	/* GPP_F1 - GPIO */
++	/* DW0: 0x04000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_F1, 0, RSMRST),
++
++	/* GPP_F2 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00003000 */
++	PAD_CFG_TERM_GPO(GPP_F2, 1, UP_20K, PLTRST),
++
++	/* GPP_F3 - GPIO */
++	/* DW0: 0x84000200, DW1: 0x00003000 */
++	PAD_CFG_TERM_GPO(GPP_F3, 0, UP_20K, PLTRST),
++
++	/* GPP_F4 - CNV_BRI_DT */
++	/* DW0: 0x44000700, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_F4, UP_20K, DEEP, NF1),
++
++	/* GPP_F5 - CNV_BRI_RSP */
++	/* DW0: 0x44000702, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_F5, UP_20K, DEEP, NF1),
++
++	/* GPP_F6 - CNV_RGI_DT */
++	/* DW0: 0x44000700, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_F6, UP_20K, DEEP, NF1),
++
++	/* GPP_F7 - CNV_RGI_RSP */
++	/* DW0: 0x44000702, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_F7, UP_20K, DEEP, NF1),
++
++	/* GPP_F8 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F8, NONE),
++
++	/* GPP_F9 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F9, NONE),
++
++	/* GPP_F10 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_F10, 1, PLTRST),
++
++	/* GPP_F11 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F11, NONE),
++
++	/* GPP_F12 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F12, NONE),
++
++	/* GPP_F13 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F13, NONE),
++
++	/* GPP_F14 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F14, NONE),
++
++	/* GPP_F15 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F15, NONE),
++
++	/* GPP_F16 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F16, NONE),
++
++	/* GPP_F17 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F17, NONE),
++
++	/* GPP_F18 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F18, NONE),
++
++	/* GPP_F19 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F19, NONE),
++
++	/* GPP_F20 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F20, NONE),
++
++	/* GPP_F21 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F21, NONE),
++
++	/* GPP_F22 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_F22, NONE),
++
++	/* GPP_F23 - A4WP_PRESENT */
++	/* DW0: 0x44000700, DW1: 0x00001000 */
++	PAD_CFG_NF(GPP_F23, DN_20K, DEEP, NF1),
++
++	/* ------- GPIO Group GPP_H ------- */
++
++	/* GPP_H0 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_H0, UP_20K),
++
++	/* GPP_H1 - CNV_RF_RESET# */
++	/* DW0: 0x44000f00, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_H1, UP_20K, DEEP, NF3),
++
++	/* GPP_H2 - MODEM_CLKREQ */
++	/* DW0: 0x44000f00, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_H2, UP_20K, DEEP, NF3),
++
++	/* GPP_H3 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00003000 */
++	PAD_NC(GPP_H3, UP_20K),
++
++	/* GPP_H4 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_H4, NONE),
++
++	/* GPP_H5 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_H5, NONE),
++
++	/* GPP_H6 - I2C3_SDA */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H6, NONE, DEEP, NF1),
++
++	/* GPP_H7 - I2C3_SCL */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H7, NONE, DEEP, NF1),
++
++	/* GPP_H8 - I2C4_SDA */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H8, NONE, DEEP, NF1),
++
++	/* GPP_H9 - I2C4_SCL */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H9, NONE, DEEP, NF1),
++
++	/* GPP_H10 - I2C5_SDA */
++	/* DW0: 0x84000603, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H10, NONE, PLTRST, NF1),
++
++	/* GPP_H11 - I2C5_SCL */
++	/* DW0: 0x84000603, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H11, NONE, PLTRST, NF1),
++
++	/* GPP_H12 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H12, 1, PLTRST),
++
++	/* GPP_H13 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H13, 1, PLTRST),
++
++	/* GPP_H14 - GPIO */
++	/* DW0: 0x84000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H14, 0, PLTRST),
++
++	/* GPP_H15 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H15, 1, PLTRST),
++
++	/* GPP_H16 - GPIO */
++	/* DW0: 0x04000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H16, 1, RSMRST),
++
++	/* GPP_H17 - GPIO */
++	/* DW0: 0x04000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H17, 1, RSMRST),
++
++	/* GPP_H18 - CPU_C10_GATE# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_H18, NONE, DEEP, NF1),
++
++	/* GPP_H19 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H19, 1, PLTRST),
++
++	/* GPP_H20 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_H20, NONE),
++
++	/* GPP_H21 - GPIO */
++	/* DW0: 0x44000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H21, 0, DEEP),
++
++	/* GPP_H22 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H22, 1, PLTRST),
++
++	/* GPP_H23 - GPIO */
++	/* DW0: 0x44000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_H23, 0, DEEP),
++
++	/* ------- GPIO Community 2 ------- */
++
++	/* ------- GPIO Group GPD ------- */
++
++	/* GPD0 - BATLOW# */
++	/* DW0: 0x04000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD0, NONE, RSMRST, NF1),
++
++	/* GPD1 - ACPRESENT */
++	/* DW0: 0x04000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPD1, NATIVE, RSMRST, NF1),
++
++	/* GPD2 - LAN_WAKE# */
++	/* DW0: 0x04000702, DW1: 0x00003c00 */
++	PAD_CFG_NF(GPD2, NATIVE, RSMRST, NF1),
++
++	/* GPD3 - PRWBTN# */
++	/* DW0: 0x04000702, DW1: 0x00003000 */
++	PAD_CFG_NF(GPD3, UP_20K, RSMRST, NF1),
++
++	/* GPD4 - SLP_S3# */
++	/* DW0: 0x04000600, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD4, NONE, RSMRST, NF1),
++
++	/* GPD5 - SLP_S4# */
++	/* DW0: 0x04000600, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD5, NONE, RSMRST, NF1),
++
++	/* GPD6 - SLP_A# */
++	/* DW0: 0x04000600, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD6, NONE, RSMRST, NF1),
++
++	/* GPD7 - GPIO */
++	/* DW0: 0x04000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPD7, 0, RSMRST),
++
++	/* GPD8 - SUSCLK */
++	/* DW0: 0x04000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD8, NONE, RSMRST, NF1),
++
++	/* GPD9 - SLP_WLAN# */
++	/* DW0: 0x04000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD9, NONE, RSMRST, NF1),
++
++	/* GPD10 - SLP_S5# */
++	/* DW0: 0x04000600, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD10, NONE, RSMRST, NF1),
++
++	/* GPD11 - LANPHYPC */
++	/* DW0: 0x04000600, DW1: 0x00000000 */
++	PAD_CFG_NF(GPD11, NONE, RSMRST, NF1),
++
++	/* ------- GPIO Community 4 ------- */
++
++	/* ------- GPIO Group GPP_C ------- */
++
++	/* GPP_C0 - SMBCLK */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C0, NONE, DEEP, NF1),
++
++	/* GPP_C1 - SMBDATA */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C1, NONE, DEEP, NF1),
++
++	/* GPP_C2 - GPIO */
++	/* DW0: 0x44000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C2, 1, DEEP),
++
++	/* GPP_C3 - SML0CLK */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C3, NONE, DEEP, NF1),
++
++	/* GPP_C4 - SML0DATA */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C4, NONE, DEEP, NF1),
++
++	/* GPP_C5 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C5, 1, PLTRST),
++
++	/* GPP_C6 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_C6, NONE),
++
++	/* GPP_C7 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_C7, NONE),
++
++	/* GPP_C8 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C8, 1, PLTRST),
++
++	/* GPP_C9 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C9, 1, PLTRST),
++
++	/* GPP_C10 - GPIO */
++	/* DW0: 0x84000200, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C10, 0, PLTRST),
++
++	/* GPP_C11 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C11, 1, PLTRST),
++
++	/* GPP_C12 - UART1_RXD */
++	/* DW0: 0x84000603, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C12, NONE, PLTRST, NF1),
++
++	/* GPP_C13 - UART1_TXD */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C13, NONE, DEEP, NF1),
++
++	/* GPP_C14 - UART1_RTS# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C14, NONE, DEEP, NF1),
++
++	/* GPP_C15 - UART1_CTS# */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C15, NONE, DEEP, NF1),
++
++	/* GPP_C16 - I2C0_SDA */
++	/* DW0: 0x84000402, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C16, NONE, PLTRST, NF1),
++
++	/* GPP_C17 - I2C0_SCL */
++	/* DW0: 0x84000402, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C17, NONE, PLTRST, NF1),
++
++	/* GPP_C18 - I2C1_SDA */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C18, NONE, DEEP, NF1),
++
++	/* GPP_C19 - I2C1_SCL */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_C19, NONE, DEEP, NF1),
++
++	/* GPP_C20 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_C20, NONE),
++
++	/* GPP_C21 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_C21, NONE),
++
++	/* GPP_C22 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_C22, 1, PLTRST),
++
++	/* GPP_C23 - GPIO */
++	/* DW0: 0x40100102, DW1: 0x00001000 */
++	PAD_CFG_GPI_APIC(GPP_C23, DN_20K, DEEP, LEVEL, NONE),
++
++	/* ------- GPIO Group GPP_E ------- */
++
++	/* GPP_E0 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_E0, NONE),
++
++	/* GPP_E1 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_E1, NONE),
++
++	/* GPP_E2 - SATAXPCIE2 */
++	/* DW0: 0x84000502, DW1: 0x00003000 */
++	PAD_CFG_NF(GPP_E2, UP_20K, PLTRST, NF1),
++
++	/* GPP_E3 - GPIO */
++	/* DW0: 0x82040102, DW1: 0x00000000 */
++	PAD_CFG_GPI_SMI(GPP_E3, NONE, PLTRST, EDGE_SINGLE, NONE),
++
++	/* GPP_E4 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_E4, 1, PLTRST),
++
++	/* GPP_E5 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_E5, NONE),
++
++	/* GPP_E6 - GPIO */
++	/* DW0: 0x44000300, DW1: 0x00000000 */
++	PAD_NC(GPP_E6, NONE),
++
++	/* GPP_E7 - GPIO */
++	/* DW0: 0x82000102, DW1: 0x00000000 */
++	PAD_CFG_GPI_TRIG_OWN(GPP_E7, NONE, PLTRST, EDGE_SINGLE, ACPI),
++
++	/* GPP_E8 - SATALED# */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E8, NONE, DEEP, NF1),
++
++	/* GPP_E9 - RESERVED */
++	/* DW0: 0x44001700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E9, NONE, DEEP, NF5),
++
++	/* GPP_E10 - RESERVED */
++	/* DW0: 0x44001700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E10, NONE, DEEP, NF5),
++
++	/* GPP_E11 - USB2_OC2# */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E11, NONE, DEEP, NF1),
++
++	/* GPP_E12 - USB2_OC3# */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E12, NONE, DEEP, NF1),
++
++	/* GPP_E13 - DDPB_HPD0 */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E13, NONE, DEEP, NF1),
++
++	/* GPP_E14 - DDPC_HPD1 */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E14, NONE, DEEP, NF1),
++
++	/* GPP_E15 - GPIO */
++	/* DW0: 0x84000201, DW1: 0x00000000 */
++	PAD_CFG_GPO(GPP_E15, 1, PLTRST),
++
++	/* GPP_E16 - GPIO */
++	/* DW0: 0x80880102, DW1: 0x00003000 */
++	PAD_CFG_GPI_SCI(GPP_E16, UP_20K, PLTRST, LEVEL, INVERT),
++
++	/* GPP_E17 - EDP_HPD */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E17, NONE, DEEP, NF1),
++
++	/* GPP_E18 - DPPB_CTRLCLK */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E18, NONE, DEEP, NF1),
++
++	/* GPP_E19 - DPPB_CTRLDATA */
++	/* DW0: 0x44000602, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E19, NONE, DEEP, NF1),
++
++	/* GPP_E20 - DPPC_CTRLCLK */
++	/* DW0: 0x44000700, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E20, NONE, DEEP, NF1),
++
++	/* GPP_E21 - DPPC_CTRLDATA */
++	/* DW0: 0x44000602, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E21, NONE, DEEP, NF1),
++
++	/* GPP_E22 - DPPD_CTRLCLK */
++	/* DW0: 0x44000702, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E22, NONE, DEEP, NF1),
++
++	/* GPP_E23 - DPPD_CTRLDATA */
++	/* DW0: 0x44000602, DW1: 0x00000000 */
++	PAD_CFG_NF(GPP_E23, NONE, DEEP, NF1),
 +};
 +
 +const struct pad_config *variant_gpio_table(size_t *num)
