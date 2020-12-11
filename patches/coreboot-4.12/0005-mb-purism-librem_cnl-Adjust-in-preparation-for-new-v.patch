@@ -403,8 +403,8 @@ index 0000000000..78236c7ea4
 +
 +# CPU (soc/intel/cannonlake/cpu.c)
 +	# Power limit
-+	register "tdp_pl1_override" = "25"
-+	register "tdp_pl2_override" = "51"
++	register "tdp_pl1_override" = "15"
++	register "tdp_pl2_override" = "28"
 +
 +	# Enable "Intel Speed Shift Technology"
 +	register "speed_shift_enable" = "1"
