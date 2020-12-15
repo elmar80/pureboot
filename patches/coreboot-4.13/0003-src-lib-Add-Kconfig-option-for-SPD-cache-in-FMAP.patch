@@ -1,0 +1,144 @@
+From 47219ca54b029bb86a1f4ec27c3cf72d881d441e Mon Sep 17 00:00:00 2001
+From: Matt DeVillier <matt.devillier@puri.sm>
+Date: Mon, 30 Nov 2020 14:30:15 -0600
+Subject: [PATCH] src/lib: Add Kconfig option for SPD cache in FMAP
+
+Currently, the option to cache DIMM SPD data in an FMAP region
+is closely coupled to a single board (google/hatch) and requires
+a custom FMAP to utilize.
+
+Loosen this coupling by introducing a Kconfig option which adds
+a correctly sized and aligned RW_SPD_CACHE region to the default FMAP.
+Add a Kconfig option for the region name, replacing the existing hard-
+coded instance in spd_cache.h. Change the inclusion of spd_cache.c to
+use this new Kconfig, rather than the board-specific one currently used.
+Lastly, have google/hatch select the new Kconfig when appropriate to
+ensure no change in current functionality.
+
+Test: build/boot WYVERN google/hatch variant with default FMAP, verify
+FMAP contains RW_SPD_CACHE, verify SPD cache used via cbmem log.
+
+Also tested on an out-of-tree Purism board.
+
+Change-Id: Iee0e7acb01e238d7ed354e3dbab1207903e3a4fc
+Signed-off-by: Matt DeVillier <matt.devillier@puri.sm>
+Reviewed-on: https://review.coreboot.org/c/coreboot/+/48520
+Reviewed-by: Tim Wawrzynczak <twawrzynczak@chromium.org>
+Reviewed-by: Furquan Shaikh <furquan@google.com>
+Tested-by: build bot (Jenkins) <no-reply@coreboot.org>
+---
+ Makefile.inc                       | 11 +++++++++++
+ src/include/spd_cache.h            |  2 +-
+ src/lib/Kconfig                    | 17 +++++++++++++++++
+ src/lib/Makefile.inc               |  2 +-
+ src/mainboard/google/hatch/Kconfig |  1 +
+ util/cbfstool/default-x86.fmd      |  1 +
+ 6 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile.inc b/Makefile.inc
+index e3afa89508..aecf33f0af 100644
+--- a/Makefile.inc
++++ b/Makefile.inc
+@@ -974,6 +974,16 @@ else
+ FMAP_SMMSTORE_ENTRY :=
+ endif
+ 
++ifeq ($(CONFIG_SPD_CACHE_IN_FMAP),y)
++FMAP_SPD_CACHE_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x4000)
++FMAP_SPD_CACHE_SIZE := $(call int-multiply, $(CONFIG_DIMM_MAX) $(CONFIG_DIMM_SPD_SIZE))
++FMAP_SPD_CACHE_SIZE := $(call int-align, $(FMAP_SPD_CACHE_SIZE), 0x1000)
++FMAP_SPD_CACHE_ENTRY := $(CONFIG_SPD_CACHE_FMAP_NAME)@$(FMAP_SPD_CACHE_BASE) $(FMAP_SPD_CACHE_SIZE)
++FMAP_CURRENT_BASE := $(call int-add, $(FMAP_SPD_CACHE_BASE) $(FMAP_SPD_CACHE_SIZE))
++else
++FMAP_SPD_CACHE_ENTRY :=
++endif
++
+ #
+ # X86 FMAP region
+ #
+@@ -1050,6 +1060,7 @@ $(obj)/fmap.fmd: $(top)/Makefile.inc $(DEFAULT_FLASHMAP) $(obj)/config.h
+ 	    -e "s,##CONSOLE_ENTRY##,$(FMAP_CONSOLE_ENTRY)," \
+ 	    -e "s,##MRC_CACHE_ENTRY##,$(FMAP_MRC_CACHE_ENTRY)," \
+ 	    -e "s,##SMMSTORE_ENTRY##,$(FMAP_SMMSTORE_ENTRY)," \
++	    -e "s,##SPD_CACHE_ENTRY##,$(FMAP_SPD_CACHE_ENTRY)," \
+ 	    -e "s,##CBFS_BASE##,$(FMAP_CBFS_BASE)," \
+ 	    -e "s,##CBFS_SIZE##,$(FMAP_CBFS_SIZE)," \
+ 		$(DEFAULT_FLASHMAP) > $@.tmp
+diff --git a/src/include/spd_cache.h b/src/include/spd_cache.h
+index 5465aadda4..a53b8eb948 100644
+--- a/src/include/spd_cache.h
++++ b/src/include/spd_cache.h
+@@ -7,7 +7,7 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ 
+-#define SPD_CACHE_FMAP_NAME	"RW_SPD_CACHE"
++#define SPD_CACHE_FMAP_NAME	(CONFIG_SPD_CACHE_FMAP_NAME)
+ #define SC_SPD_NUMS		(CONFIG_DIMM_MAX)
+ #define SC_SPD_OFFSET(n)	(CONFIG_DIMM_SPD_SIZE * n)
+ #define SC_CRC_OFFSET		(CONFIG_DIMM_MAX * CONFIG_DIMM_SPD_SIZE)
+diff --git a/src/lib/Kconfig b/src/lib/Kconfig
+index d6e7e51d5c..e9a9f66aba 100644
+--- a/src/lib/Kconfig
++++ b/src/lib/Kconfig
+@@ -54,6 +54,23 @@ config DIMM_SPD_SIZE
+ config SPD_READ_BY_WORD
+ 	bool
+ 
++config SPD_CACHE_IN_FMAP
++	bool
++	default n
++	help
++	  Enables capability to cache DIMM SPDs in a dedicated FMAP region
++	  to speed loading of SPD data. Currently requires board-level
++	  romstage implementation to read/write/utilize cached SPD data.
++	  When the default FMAP is used, will create a region named RW_SPD_CACHE
++	  to store the cached SPD data.
++
++config SPD_CACHE_FMAP_NAME
++	string
++	depends on SPD_CACHE_IN_FMAP
++	default "RW_SPD_CACHE"
++	help
++	  Name of the FMAP region created in the default FMAP to cache SPD data.
++
+ if RAMSTAGE_LIBHWBASE
+ 
+ config HWBASE_DYNAMIC_MMIO
+diff --git a/src/lib/Makefile.inc b/src/lib/Makefile.inc
+index c228f2a9f4..268cc78fae 100644
+--- a/src/lib/Makefile.inc
++++ b/src/lib/Makefile.inc
+@@ -375,4 +375,4 @@ endif
+ 
+ ramstage-y += uuid.c
+ 
+-romstage-$(CONFIG_ROMSTAGE_SPD_SMBUS) += spd_cache.c
++romstage-$(CONFIG_SPD_CACHE_IN_FMAP) += spd_cache.c
+diff --git a/src/mainboard/google/hatch/Kconfig b/src/mainboard/google/hatch/Kconfig
+index 12e56384bd..0848aee140 100644
+--- a/src/mainboard/google/hatch/Kconfig
++++ b/src/mainboard/google/hatch/Kconfig
+@@ -86,6 +86,7 @@ config ROMSTAGE_SPD_CBFS
+ config ROMSTAGE_SPD_SMBUS
+ 	bool
+ 	default n
++	select SPD_CACHE_IN_FMAP
+ 
+ config DRIVER_TPM_SPI_BUS
+ 	default 0x1
+diff --git a/util/cbfstool/default-x86.fmd b/util/cbfstool/default-x86.fmd
+index f0143e9575..25c5096ae1 100644
+--- a/util/cbfstool/default-x86.fmd
++++ b/util/cbfstool/default-x86.fmd
+@@ -12,6 +12,7 @@ FLASH@##ROM_BASE## ##ROM_SIZE## {
+ 		##CONSOLE_ENTRY##
+ 		##MRC_CACHE_ENTRY##
+ 		##SMMSTORE_ENTRY##
++		##SPD_CACHE_ENTRY##
+ 		FMAP@##FMAP_BASE## ##FMAP_SIZE##
+ 		COREBOOT(CBFS)@##CBFS_BASE## ##CBFS_SIZE##
+ 	}
+-- 
+2.20.1
+

@@ -1,0 +1,138 @@
+From 446d1cc462458c6234ba320ba9bda3ae1345818e Mon Sep 17 00:00:00 2001
+From: Matt DeVillier <matt.devillier@puri.sm>
+Date: Mon, 16 Nov 2020 15:36:23 -0600
+Subject: [PATCH] mb/purism/librem_cnl: move setting of FSP-M UPDs into
+ variant.c
+
+The upcoming Librem 14 variant won't use the same SATA HSIO adjustments
+as the Librem Mini, so move these settings into a variant-specific file.
+
+Rename existing gpio.h to variant.h, move to board root directory, and
+use for all variant-specific declarations; adjust references as needed.
+
+Add newly-created variant.c to Makefile.
+
+Test: build/boot Librem Mini, verify SATA functionality unchanged.
+
+Change-Id: Ie8f714cc759675c692ad6e3f20e50adad8d09d4b
+Signed-off-by: Matt DeVillier <matt.devillier@puri.sm>
+Reviewed-on: https://review.coreboot.org/c/coreboot/+/48519
+Reviewed-by: Angel Pons <th3fanbus@gmail.com>
+Tested-by: build bot (Jenkins) <no-reply@coreboot.org>
+---
+ src/mainboard/purism/librem_cnl/Makefile.inc         |  2 ++
+ src/mainboard/purism/librem_cnl/ramstage.c           |  2 +-
+ src/mainboard/purism/librem_cnl/romstage.c           |  8 ++------
+ .../librem_mini/include/variant/gpio.h => variant.h} |  7 +++++--
+ .../purism/librem_cnl/variants/librem_mini/gpio.c    |  2 +-
+ .../purism/librem_cnl/variants/librem_mini/variant.c | 12 ++++++++++++
+ 6 files changed, 23 insertions(+), 10 deletions(-)
+ rename src/mainboard/purism/librem_cnl/{variants/librem_mini/include/variant/gpio.h => variant.h} (56%)
+ create mode 100644 src/mainboard/purism/librem_cnl/variants/librem_mini/variant.c
+
+diff --git a/src/mainboard/purism/librem_cnl/Makefile.inc b/src/mainboard/purism/librem_cnl/Makefile.inc
+index ba157dfd05..8e3b5a6f36 100644
+--- a/src/mainboard/purism/librem_cnl/Makefile.inc
++++ b/src/mainboard/purism/librem_cnl/Makefile.inc
+@@ -1,5 +1,7 @@
+ ## SPDX-License-Identifier: GPL-2.0-only
+ 
++romstage-y += variants/$(VARIANT_DIR)/variant.c
++
+ ramstage-y += variants/$(VARIANT_DIR)/gpio.c
+ ramstage-y += variants/$(VARIANT_DIR)/hda_verb.c
+ ramstage-y += ramstage.c
+diff --git a/src/mainboard/purism/librem_cnl/ramstage.c b/src/mainboard/purism/librem_cnl/ramstage.c
+index 56ed1b7844..e93911e324 100644
+--- a/src/mainboard/purism/librem_cnl/ramstage.c
++++ b/src/mainboard/purism/librem_cnl/ramstage.c
+@@ -1,7 +1,7 @@
+ /* SPDX-License-Identifier: GPL-2.0-only */
+ 
+ #include <soc/ramstage.h>
+-#include <variant/gpio.h>
++#include "variant.h"
+ 
+ void mainboard_silicon_init_params(FSP_S_CONFIG *params)
+ {
+diff --git a/src/mainboard/purism/librem_cnl/romstage.c b/src/mainboard/purism/librem_cnl/romstage.c
+index 3a3ca6b491..b7c57ee379 100644
+--- a/src/mainboard/purism/librem_cnl/romstage.c
++++ b/src/mainboard/purism/librem_cnl/romstage.c
+@@ -2,6 +2,7 @@
+ 
+ #include <soc/cnl_memcfg_init.h>
+ #include <soc/romstage.h>
++#include "variant.h"
+ 
+ static const struct cnl_mb_cfg memcfg = {
+ 
+@@ -50,10 +51,5 @@ void mainboard_memory_init_params(FSPM_UPD *memupd)
+ {
+ 	FSP_M_CONFIG *mem_cfg = &memupd->FspmConfig;
+ 	cannonlake_memcfg_init(mem_cfg, &memcfg);
+-
+-	/* Enable and set SATA HSIO adjustments for ports 0 and 2 */
+-	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[0] = 1;
+-	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[2] = 1;
+-	mem_cfg->PchSataHsioRxGen3EqBoostMag[0] = 2;
+-	mem_cfg->PchSataHsioRxGen3EqBoostMag[2] = 1;
++	variant_memory_init_params(mem_cfg);
+ }
+diff --git a/src/mainboard/purism/librem_cnl/variants/librem_mini/include/variant/gpio.h b/src/mainboard/purism/librem_cnl/variant.h
+similarity index 56%
+rename from src/mainboard/purism/librem_cnl/variants/librem_mini/include/variant/gpio.h
+rename to src/mainboard/purism/librem_cnl/variant.h
+index 9094b0419d..79a32414b8 100644
+--- a/src/mainboard/purism/librem_cnl/variants/librem_mini/include/variant/gpio.h
++++ b/src/mainboard/purism/librem_cnl/variant.h
+@@ -1,11 +1,14 @@
+ /* SPDX-License-Identifier: GPL-2.0-only */
+ 
+-#ifndef VARIANT_GPIO_H
+-#define VARIANT_GPIO_H
++#ifndef VARIANT_H
++#define VARIANT_H
+ 
+ #include <soc/gpe.h>
+ #include <soc/gpio.h>
++#include <soc/romstage.h>
+ 
+ const struct pad_config *variant_gpio_table(size_t *num);
+ 
++void variant_memory_init_params(FSP_M_CONFIG *mem_cfg);
++
+ #endif
+diff --git a/src/mainboard/purism/librem_cnl/variants/librem_mini/gpio.c b/src/mainboard/purism/librem_cnl/variants/librem_mini/gpio.c
+index 8fa4ac57ec..08134e0c76 100644
+--- a/src/mainboard/purism/librem_cnl/variants/librem_mini/gpio.c
++++ b/src/mainboard/purism/librem_cnl/variants/librem_mini/gpio.c
+@@ -1,6 +1,6 @@
+ /* SPDX-License-Identifier: GPL-2.0-only */
+ 
+-#include <variant/gpio.h>
++#include "../../variant.h"
+ 
+ /* Pad configuration was generated automatically using intelp2m utility */
+ static const struct pad_config gpio_table[] = {
+diff --git a/src/mainboard/purism/librem_cnl/variants/librem_mini/variant.c b/src/mainboard/purism/librem_cnl/variants/librem_mini/variant.c
+new file mode 100644
+index 0000000000..9d7e27fd3e
+--- /dev/null
++++ b/src/mainboard/purism/librem_cnl/variants/librem_mini/variant.c
+@@ -0,0 +1,12 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++
++#include "../../variant.h"
++
++void variant_memory_init_params(FSP_M_CONFIG *mem_cfg)
++{
++	/* Enable and set SATA HSIO adjustments for ports 0 and 2 */
++	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[0] = 1;
++	mem_cfg->PchSataHsioRxGen3EqBoostMagEnable[2] = 1;
++	mem_cfg->PchSataHsioRxGen3EqBoostMag[0] = 2;
++	mem_cfg->PchSataHsioRxGen3EqBoostMag[2] = 1;
++}
+-- 
+2.20.1
+

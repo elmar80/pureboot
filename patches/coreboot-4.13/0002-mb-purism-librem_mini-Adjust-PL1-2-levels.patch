@@ -1,0 +1,34 @@
+From 0985e4ac8021ddfb8590346b9e5a818cf04056ab Mon Sep 17 00:00:00 2001
+From: Matt DeVillier <matt.devillier@puri.sm>
+Date: Fri, 11 Dec 2020 12:33:57 -0600
+Subject: [PATCH] mb/purism/librem_mini: Adjust PL1/2 levels
+
+While the Librem Mini (v1/v2) are more than capable of higher
+PL1/2, they currently ship with a 40W power supply, so set PL1/2
+accordingly to avoid power spikes above the PSU rating (which can
+result in unexpected showdowns/reboots)
+
+Change-Id: Ia7f89e885f1af29cbbb67d6fb844257ba2b87417
+Signed-off-by: Matt DeVillier <matt.devillier@puri.sm>
+---
+ .../purism/librem_cnl/variants/librem_mini/devicetree.cb      | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/mainboard/purism/librem_cnl/variants/librem_mini/devicetree.cb b/src/mainboard/purism/librem_cnl/variants/librem_mini/devicetree.cb
+index c39bccf249..b142781e01 100644
+--- a/src/mainboard/purism/librem_cnl/variants/librem_mini/devicetree.cb
++++ b/src/mainboard/purism/librem_cnl/variants/librem_mini/devicetree.cb
+@@ -7,8 +7,8 @@ chip soc/intel/cannonlake
+ # CPU (soc/intel/cannonlake/cpu.c)
+ 	# Power limit
+ 	register "power_limits_config" = "{
+-		.tdp_pl1_override = 25,
+-		.tdp_pl2_override = 51,
++		.tdp_pl1_override = 15,
++		.tdp_pl2_override = 28,
+ 	}"
+ 
+ 	# Enable Enhanced Intel SpeedStep
+-- 
+2.20.1
+
