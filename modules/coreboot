@@ -19,7 +19,7 @@ else ifeq "$(CONFIG_COREBOOT_VERSION)" "4.13"
 else ifeq "$(CONFIG_COREBOOT_VERSION)" "purism"
 	coreboot_version := git
 	coreboot_repo := https://source.puri.sm/coreboot/coreboot
-	coreboot_commit_hash := 8ebb5caf66b23ab53038752e5bc5590f3325e54e
+	coreboot_commit_hash := f4e51ba16eb679f953aff5d3a56acb8e290d01d1
 else
 	$(error "$(BOARD): does not specify coreboot version under CONFIG_COREBOOT_VERSION")
 endif 
